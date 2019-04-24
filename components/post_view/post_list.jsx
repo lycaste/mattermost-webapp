@@ -5,6 +5,7 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import {DynamicSizeList} from 'react-window';
+import {debounce} from 'mattermost-redux/actions/helpers';
 
 import LoadingScreen from 'components/loading_screen.jsx';
 
@@ -21,7 +22,7 @@ import ScrollToBottomArrows from './scroll_to_bottom_arrows';
 const MAX_NUMBER_OF_AUTO_RETRIES = 3;
 
 const MAX_EXTRA_PAGES_LOADED = 10;
-const OVERSCAN_COUNT_BACKWARD = window.OVERSCAN_COUNT_BACKWARD || 50; // Exposing the value for PM to test will be removed soon
+const OVERSCAN_COUNT_BACKWARD = window.OVERSCAN_COUNT_BACKWARD || 100; // Exposing the value for PM to test will be removed soon
 const OVERSCAN_COUNT_FORWARD = window.OVERSCAN_COUNT_FORWARD || 100; // Exposing the value for PM to test will be removed soon
 const HEIGHT_TRIGGER_FOR_MORE_POSTS = window.HEIGHT_TRIGGER_FOR_MORE_POSTS || 1000; // Exposing the value for PM to test will be removed soon
 
@@ -145,7 +146,9 @@ export default class PostList extends React.PureComponent {
 
         if (this.state.postListIds.length !== prevState.postListIds.length && this.state.postListIds[0] === prevState.postListIds[0]) {
             const scrollValue = snapshot.previousScrollTop + (postlistScrollHeight - snapshot.previousScrollHeight);
-            this.listRef.current.scrollTo(scrollValue, scrollValue - snapshot.previousScrollTop);
+            if (scrollValue !== 0 && (scrollValue - snapshot.previousScrollTop) !== 0) {
+                this.listRef.current.scrollTo(scrollValue, scrollValue - snapshot.previousScrollTop, true);
+            }
         }
     }
 
@@ -213,7 +216,9 @@ export default class PostList extends React.PureComponent {
         if (error) {
             if (this.autoRetriesCount < MAX_NUMBER_OF_AUTO_RETRIES) {
                 this.autoRetriesCount++;
-                this.loadMorePosts();
+                debounce(() => {
+                    this.loadMorePosts();
+                });
             } else if (this.mounted) {
                 this.setState({autoRetryEnable: false});
             }
@@ -460,6 +465,7 @@ export default class PostList extends React.PureComponent {
                                         skipResizeClass='col__reply'
                                         innerRef={this.postlistRef}
                                         style={virtListStyles}
+                                        initRangetToRender={[0, Math.min(this.state.postListIds.length - 1, 60)]}
                                     >
                                         {this.renderRow}
                                     </DynamicSizeList>
